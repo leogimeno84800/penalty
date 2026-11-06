@@ -187,6 +187,7 @@ function greenAt(now){
 }
 // niveau 3 : chaque caisse a un minuteur (10, 12, 14, 16 s) affiché par sa barre LED
 let lost=false;
+let l2Hist=[]; // ordre des caisses réussies au niveau 2
 // survivre 1 min 40 ; un ballon dans une caisse recharge sa barre à fond
 const L3={t0:0,stop:0,total:30000,dur:[10000,12000,14000,16000],start:[0,0,0,0]};
 function l3Frac(i,now){if(!started)return 1;return Math.min(1,Math.max(0,1-((L3.stop||now)-L3.start[i])/L3.dur[i]));}
@@ -257,7 +258,7 @@ function endIn(type,ms){clearTimeout(endTimer);endTimer=setTimeout(()=>showEnd(t
 function reset(){
   clearTimeout(endTimer);drag=null;
   filled=[false,false,false,false];shots=0;won=false;winEl.hidden=true;hintEl.classList.remove('off');
-  fades=[];randomHoles();layout();updateHud();newBall();
+  fades=[];l2Hist=[];randomHoles();layout();updateHud();newBall();
   if(level===2){L2.gap=1000+Math.random()*2000;setupL2Phase(performance.now());}
   lost=false;L3.stop=0;
   if(level===3){const t=performance.now();L3.t0=t;L3.start=[t,t,t,t];L3.dur=[10000,12000,14000,16000].sort(()=>Math.random()-.5);}
@@ -298,7 +299,7 @@ function resolve(){
     beep(500,1200,.22,'square',.1);setTimeout(newBall,200);return;
   }
   if(hit>=0&&!filled[hit]&&(level!==2||greenAt(performance.now())===hit)){
-    filled[hit]=true;ball.state='in';
+    filled[hit]=true;ball.state='in';l2Hist.push(hit);
     fades.push({i:hit,t0:performance.now(),c:'g',lv0:level===3?l3Frac(hit,performance.now()):1});
     if(level===2)setupL2Phase(performance.now());
     beep(700,180,.35,'square',.1);
@@ -306,6 +307,12 @@ function resolve(){
     if(filled.every(Boolean)){won=true;L3.stop=performance.now();gameStop=performance.now();endIn('unlock',900);}
     else setTimeout(newBall,200);
     return;
+  }
+  // niveau 2 : ballon dans une caisse rouge = la dernière caisse réussie se rallume
+  if(level===2&&hit>=0&&!filled[hit]){
+    const back=l2Hist.pop();
+    if(back!==undefined){filled[back]=false;fades=fades.filter(f=>f.i!==back);setupL2Phase(performance.now());updateHud();}
+    ball.state='in';beep(220,80,.4,'sawtooth',.14);setTimeout(newBall,200);return;
   }
   beep(140,90,.18,'triangle',.25);
   ball.state='drop';ball.t1=performance.now();ball.dy0=ball.y;
